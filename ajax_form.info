@@ -1,0 +1,4 @@
+name = Ajax form
+description = Functions applicable to drupal applications.
+package = Custom
+core = 7.x

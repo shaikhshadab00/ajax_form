@@ -1,0 +1,266 @@
+<?php
+
+/**
+ * @file
+ *
+ * Implementation of Ajax custom form.
+ */
+
+function ajax_form_menu() {
+  $items = array();
+
+  $items['admin/config/magazine-settings'] = array(
+		'title' => t('THE MAGAZINE GUIDE SETTINGS'),
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('ajax_form_magazine_admin_settings'),
+		'access arguments' => array('access administration menu'),
+		'type' => MENU_NORMAL_ITEM,
+  );
+  
+  $items['ajax-form-autocomplete-engine'] = array(
+		'page callback' => 'ajax_form_autocomplete_engine',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+
+  return $items;
+}
+
+/**
+ * Admin setting form  magazine page.
+ */
+function ajax_form_magazine_admin_settings($form, &$form_state) {
+
+	$default_magazine_settings = array();
+	$magazine_settings = variable_get('magazine_settings', $default_magazine_settings);
+
+	// General  magazin page 
+	$form['magazine_settings'] = array(
+		'#type' => 'fieldset',
+		'#title' => t(' Magazine Settings'),
+		'#collapsible' => true,
+		'#collapsed' => FALSE,
+		'#tree' => TRUE,
+		'#weight' => -1,
+    );
+	
+	$magazine_setting_columns = array('a');
+    foreach ($magazine_setting_columns as $key => $column) {
+		// General  magazin page 
+		$form['magazine_settings']["magazine_settings_{$column}"] = array(
+			'#type' => 'fieldset',
+			'#title' => " Magazine Settings {$column}",
+			'#collapsible' => true,
+			'#collapsed' => FALSE,
+		);
+
+		$form['magazine_settings']["magazine_settings_{$column}"]['left'] = array(
+			'#type' => 'fieldset',
+			'#title' => " Magazine Settings {$column} left",
+			'#collapsible' => true,
+			'#collapsed' => FALSE,
+			'#prefix' => '<div style="width: 50%; float: left;">',
+			'#suffix' => '</div>',
+		);
+		
+		$form['magazine_settings']["magazine_settings_{$column}"]['right'] = array(
+			'#type' => 'fieldset',
+			'#title' => " Magazine Settings {$column} right",
+			'#collapsible' => true,
+			'#collapsed' => FALSE,
+			'#prefix' => '<div style="width: 50%; float: left;">',
+			'#suffix' => '</div>',
+        );
+        
+        $field_numbers = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+		
+		foreach($field_numbers as $field_number) {
+			$which_column = 'left';
+			if (in_array($field_number, array(2,3,7,10,12,15))) {
+				$which_column = 'right';
+			}
+			$style = 'clear: both;';
+			if (in_array($field_number, array(4,5,8,9,13,14))) {
+				$style = 'width: 50%; float: left';
+			}
+			$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"] = array(
+				'#title' => "{$column}{$field_number}",
+				'#type' => 'fieldset',
+				'#collapsible' => true,
+				'#collapsed' => !$form_state['rebuild'],
+				'#prefix' => '<div id="' . "magazine_settings_{$column}_{$column}{$field_number}" . '" style="' . $style. '">',
+				'#suffix' => '</div>',
+			);
+			$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['nid'] = array(
+				'#type' => 'textfield',
+				'#title' => "{$column}{$field_number} nid",
+				'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['nid']) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['nid'] : '',
+				'#description' => "Enter nid for {$column}{$field_number}",
+				'#autocomplete_path' => 'ajax-form-autocomplete-engine',
+				'#size' => 60,
+				'#maxlength' => 99,
+				'#resizable' => FALSE,
+				'#ajax' => array(
+					'callback' => 'ajax_form_magazine_admin_settings_auto_fill_callback',
+					'wrapper' => "magazine_settings_{$column}_{$column}{$field_number}",
+		  			'method' => 'replace',
+		  			'effect' => 'fade',
+				),
+			);
+			$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['link'] = array(
+				'#type' => 'textfield',
+				'#title' => "{$column}{$field_number} link",
+				'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['link']) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['link'] : '',
+				'#description' => "Enter link for {$column}{$field_number}",
+				'#size' => 60,
+				'#maxlength' => 99,
+				'#resizable' => FALSE,
+			);
+			$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['type'] = array(
+				'#type' => 'select',
+				'#options' => array(
+					'image' => "Image",
+					'gallery' => "Image Gallery",
+				),
+				'#title' => "{$column}{$field_number} type",
+				'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['type']) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]['type'] : '',
+				'#description' => "Select type {$column}{$field_number}",
+			);
+			switch ($field_number) {
+				// Title field.
+				case 1:
+					$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["title"] = array(
+						'#type' => 'textfield',
+						'#title' => "{$column}{$field_number} Title",
+						'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["title"]) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["title"] : '',
+						'#description' => "Enter {$column}{$field_number} Title",
+						'#size' => 60,
+						'#maxlength' => 99,
+						'#resizable' => FALSE,
+					);
+				  break;
+				  // lead text, seprater text and seprater link.
+				  case 2:
+				  case 3:
+				  case 6:
+				  case 7:
+				  case 8:
+				  case 9:
+				  case 10:
+				  case 11;
+				  case 12:
+				  case 15:
+				  case 16:
+					$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["title"] = array(
+						'#type' => 'textfield',
+						'#title' => "{$column}{$field_number} Title",
+						'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["title"]) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["title"] : '',
+						'#description' => "Enter {$column}{$field_number} Title",
+						'#size' => 60,
+						'#maxlength' => 99,
+						'#resizable' => FALSE,
+					);
+					$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["lead_text"] = array(
+						'#type' => 'textfield',
+						'#title' => "{$column}{$field_number} Lead Text",
+						'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["lead_text"]) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["lead_text"] : '',
+						'#description' => "Enter {$column}{$field_number} Lead Text",
+						'#size' => 60,
+						'#maxlength' => 99,
+						'#resizable' => FALSE,
+					);
+					$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["seperation_text"] = array(
+						'#type' => 'textfield',
+						'#title' => "{$column}{$field_number} Seperation Text",
+						'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["seperation_text"]) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["seperation_text"] : '',
+						'#description' => "Enter {$column}{$field_number} Seperation Text",
+						'#size' => 60,
+						'#maxlength' => 99,
+						'#resizable' => FALSE,
+					);
+					$form['magazine_settings']["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["seperation_link"] = array(
+						'#type' => 'textfield',
+						'#title' => "{$column}{$field_number} Seperation Link",
+						'#default_value' => isset($magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["seperation_link"]) ? $magazine_settings["magazine_settings_{$column}"]["{$which_column}"]["{$column}{$field_number}"]["seperation_link"] : '',
+						'#description' => "Enter {$column}{$field_number} Seperation Link",
+						'#size' => 60,
+						'#maxlength' => 99,
+						'#resizable' => FALSE,
+					);
+				  break;
+			}
+		}
+	}
+
+	//dpm($form_state['values']['magazine_settings']);
+
+
+	return system_settings_form($form);
+	
+}
+
+/**
+ * Ajax callback function to populate fields.
+ */
+function ajax_form_magazine_admin_settings_auto_fill_callback($form, &$form_state) {
+	if(!empty($form_state['triggering_element']['#name']) && !empty($form_state['values']['magazine_settings'])) {
+		$trigger_element_name = $form_state['triggering_element']['#name'];
+		$magazine_setting_values = $form_state['values']['magazine_settings'];
+		if (preg_match_all("/\[(.*?)\]/", $trigger_element_name, $matches)) {
+			$matche = $matches[1];
+			$trigger_nid = $magazine_setting_values[$matche[0]][$matche[1]][$matche[2]][$matche[3]];
+			if(is_numeric($trigger_nid)) {
+				$node = node_load($trigger_nid);
+				
+				// Link
+				if (isset($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['link']) && empty($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['link'])) {
+					$form['magazine_settings'][$matche[0]][$matche[1]][$matche[2]]['link']['#value'] = 'node/' . $node->nid;
+				}
+
+				// title
+				if (isset($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['title']) && empty($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['title']) && isset($node->title)) {
+					$form['magazine_settings'][$matche[0]][$matche[1]][$matche[2]]['title']['#value'] = substr($node->title, 0, 99);
+				}
+
+				// Lead Text
+				if (isset($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['lead_text']) && empty($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['lead_text']) && isset($node->field_lead_text['und'])) {
+					$form['magazine_settings'][$matche[0]][$matche[1]][$matche[2]]['lead_text']['#value'] = !empty($node->field_lead_text['und'][0]['value']) ? substr($node->field_lead_text['und'][0]['value'], 0, 99) : '';
+				}
+
+				// Seperation Text
+				if (isset($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['seperation_text']) && empty($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['seperation_text'])) {
+					$form['magazine_settings'][$matche[0]][$matche[1]][$matche[2]]['seperation_text']['#value'] = 'Shop Now';
+				}
+
+				// Seperation Link
+				if (isset($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['seperation_link']) && empty($magazine_setting_values[$matche[0]][$matche[1]][$matche[2]]['seperation_link'])) {
+					$form['magazine_settings'][$matche[0]][$matche[1]][$matche[2]]['seperation_link']['#value'] = 'general-product-page/' . $node->nid;
+				}
+			}
+		}
+
+	}
+
+	return $form['magazine_settings'][$matche[0]][$matche[1]][$matche[2]];
+}
+
+/**
+ * callback function for ajax_form_autocomplete_engine
+ */
+function ajax_form_autocomplete_engine($text) {
+
+	$matches = array(); 
+	$query = db_select('node', 'n');
+	$query->fields('n', array('title'));
+	$query->fields('n', array('nid'));
+	$query->condition('n.title', '%' . db_like($text) . '%', 'LIKE');
+	$query->range(0, 20);
+	$result = $query->execute();
+
+	foreach ($result as $node) {
+		$title_with_nid = check_plain($node->title) . ' (' . $node->nid . ')';
+		$matches[$node->nid] = $title_with_nid; 
+	} 
+	
+	drupal_json_output($matches);
+}
