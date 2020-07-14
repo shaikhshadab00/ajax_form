@@ -264,3 +264,218 @@ function ajax_form_autocomplete_engine($text) {
 	
 	drupal_json_output($matches);
 }
+
+
+
+/** Copy content from other site */
+
+/**
+ * Implements hook_form_FORM_ID_alter 
+ */
+function ajax_form_form_node_form_alter(&$form, &$form_state) { //dsm($form['#form_id']);
+  if ($form['#form_id'] == 'article_listing_node_form') {
+	  $enable = variable_get('copy_content_enable_article', '');
+    $node = isset($form['#node']) ? $form['#node'] : '';
+    // $node_type = isset($node->type) ? $node->type : ''; 
+    // $allow_node_type = variable_get('copy_content_allow_node_type', '');
+    // $allow_node_type = array_filter($allow_node_type);
+  
+    // This is a new node.
+    if ((!isset($node->nid) || isset($node->is_new)) && $enable) {
+    //if (in_array($node_type, $allow_node_type)) {
+      $site_domain = isset($_GET['domain']) ? $_GET['domain'] : '';
+      $site_domain_nid = isset($_GET['nid']) ? $_GET['nid'] : '';
+      $domain_list = variable_get('copy_content_domain_list', '');
+      $data = ajax_form_generate_get_content_from_other_domain($site_domain, $site_domain_nid);
+
+      // Set title default value 
+      if (!empty($data->title)) {
+        $form['title']['#default_value'] = $data->title; 
+      }
+
+      // Set body default value 
+      if (!empty($data->body)) {
+        $form['body']['und'][0]['#default_value'] = $data->body; 
+      }
+
+      // Set lead text default value 
+      if (!empty($data->lead_text)) {
+        $form['field_lead_text']['und'][0]['value']['#default_value'] = $data->lead_text;
+      }
+
+      $form['copy_content_fieldset'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Copy content'),
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+        '#tree' => TRUE,
+        '#weight' => -1,
+        '#prefix' => '<div id="copy-content-wrapper">',
+        '#suffix' => '</div>',
+      );
+      $form['copy_content_fieldset']['site_domain_select'] = array(
+        '#type' => 'select',
+        '#title' => t('Select site domain'),
+        '#options' => ajax_form_generate_list_from_textarea_value($domain_list),
+        '#default_value' => $site_domain,
+        '#prefix' => '<div style="width: 50%; float: left; padding: 0px 20px;">',
+        '#suffix' => '</div>',
+      );
+      $form['copy_content_fieldset']['site_domain_nid'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Site Domain Nid',
+        '#attributes' => array(
+          ' type' => 'number', // insert space before attribute name :)
+        ),
+        '#default_value' => $site_domain_nid,
+        '#prefix' => '<div style="width: 50%; float: left; padding: 0px 20px;">',
+        '#suffix' => '</div>',
+      );
+      $form['copy_content_fieldset']['current_path_alias'] = array(
+        '#type' => 'hidden',
+        '#value' => drupal_get_path_alias(),
+      );
+      // $form['copy_content_fieldset']['copy_content_submit'] = array(
+      //   '#type' => 'submit',
+      //   '#value' => t('Copy content'),
+      //   '#ajax' => array(
+      //       'callback' => 'ajax_form_copy_content_ajax',
+      //       'wrapper' => 'copy-content-wrapper',
+      //       'effect' => 'fade',
+      //   ),
+      //   '#prefix' => '<div style="clear: both; padding: 0px 20px;">',
+      //   '#suffix' => '</div>',
+      // );
+      $form['copy_content_fieldset']['copy_content_submit'] = array(
+        '#type' => 'button',
+        '#value' => t('Copy content'),
+        '#limit_validation_errors' => array(),
+        '#prefix' => '<div style="clear: both; padding: 0px 20px;">',
+        '#suffix' => '</div>',
+      );
+      $form['#attached']['js'][] = array(
+        'type' => 'inline',
+        'data' => 'jQuery(document).ready(function () { 
+          alert("Hello!"); 
+          jQuery("#edit-copy-content-fieldset-copy-content-submit").click(function(){
+            var domain = jQuery("#edit-copy-content-fieldset-site-domain-select").val(); 
+            var nid = jQuery("#edit-copy-content-fieldset-site-domain-nid").val();
+            if (domain && nid) {
+              window.location =  window.location.pathname + "?domain=" + domain + "&nid=" + nid;
+              return false;
+            }
+          }); 
+        });',
+        'scope' => 'footer',
+        'group' => JS_THEME,
+        'weight' => 5,
+      );
+    }
+  }
+}
+
+/**
+ * Ajax callback function copy content
+ */
+function ajax_form_copy_content_ajax($form, &$form_state) {
+  $values = $form_state['values'];
+  $current_path_alias = !empty($values['copy_content_fieldset']['current_path_alias']) ? ($values['copy_content_fieldset']['current_path_alias']) : ''; 
+  $site_domain = !empty($values['copy_content_fieldset']['site_domain_select']) ? ($values['copy_content_fieldset']['site_domain_select']) : ''; 
+  $site_domain_nid = !empty($values['copy_content_fieldset']['site_domain_nid']) ? ($values['copy_content_fieldset']['site_domain_nid']) : '';
+  $commands = array();
+
+  if (!empty($current_path_alias) && !empty($site_domain) && !empty($site_domain_nid)) {
+    ctools_include('ajax');
+    ctools_add_js('ajax-responder');
+    ctools_ajax_command_redirect('url_path_without_base_url',0,array('query'=>array('param1'=>'value1')));            
+    $commands[] = ctools_ajax_command_redirect($current_path_alias, 0, array('query'=>array('site-domain'=> $site_domain, 'site-domain-nid' => $site_domain_nid)));
+  }
+
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Helper function to generate list from textarea value
+ * 
+ * @param $textarea_value
+ *  $Textarea value in key|value format
+ * 
+ * @return $list
+ *  array of list
+ */
+function ajax_form_generate_list_from_textarea_value($textarea_value) {
+  $list = array();
+
+  if (!empty($textarea_value)) { 
+    $textarea_value_exploaded_by_eol = explode(PHP_EOL, $textarea_value); 
+    foreach($textarea_value_exploaded_by_eol as $value) {
+      $textarea_value_exploaded_by_pipeline = explode('|', $value);
+      if (isset($textarea_value_exploaded_by_pipeline[0])) {
+        $key = $textarea_value_exploaded_by_pipeline[0];
+        $val = isset($textarea_value_exploaded_by_pipeline[1]) ? $textarea_value_exploaded_by_pipeline[1] : $key;
+        $list["{$key}"] = $val;
+      }
+    }
+    if (!empty($list)) {
+      array_unshift($list,"None");
+      $a = array_map('trim', array_keys($list));
+      $b = array_map('trim', $list);
+      $list = array_combine($a, $b);
+    }
+  }
+
+  return $list;
+}
+
+/**
+ * Helper function to get content from other domain
+ * 
+ * @param $domain_name
+ *  Name of the other domain
+ * 
+ * @param $domain_nid
+ *  node id of other domain
+ * 
+ * @return $data
+ *  array of node data
+ */
+ function ajax_form_generate_get_content_from_other_domain($domain_name, $domain_nid) {
+    $data = array();    
+    if (is_numeric($domain_nid) && !empty($domain_name)) {
+      $domain_name = preg_replace('/\v(?:[\v\h]+)/', '', $domain_name);
+      $domain_nid = preg_replace('/\v(?:[\v\h]+)/', '', $domain_nid);
+      
+      // From cms
+      // if (strrpos($domain_name, 'http://bond:jamesbond@cms.') === false) {
+      //   $domain_name = 'http://bond:jamesbond@cms.' . $domain_name;
+      // }
+      // From live
+      if (strrpos($domain_name, 'https://www.') === false) {
+        $domain_name = 'https://www.' . $domain_name;
+      }
+      if (strrpos($domain_name, '.com') === false) {
+        $domain_name .= '.com';
+      }
+
+      $url = $domain_name .'/contentasjson/node/'. $domain_nid;
+      $curlSession = curl_init();
+      curl_setopt($curlSession, CURLOPT_SSL_VERIFYHOST, 0);
+      curl_setopt($curlSession, CURLOPT_SSL_VERIFYPEER, 0);
+
+      curl_setopt($curlSession, CURLOPT_URL, $url);
+      curl_setopt($curlSession, CURLOPT_VERBOSE, true);
+      curl_setopt($curlSession, CURLOPT_RETURNTRANSFER, true);
+
+      curl_setopt($curlSession, CURLOPT_CONNECTTIMEOUT, 1);
+      curl_setopt($curlSession, CURLOPT_TIMEOUT, 10);
+      curl_setopt($curlSession, CURLOPT_HTTPHEADER, array('Content-type: application/hal+json'));
+
+      $result = curl_exec($curlSession);
+      curl_close($curlSession);
+
+      $obj = json_decode($result);
+      $data = !empty($obj[0]) ? $obj[0] : $data; 
+    }
+
+    return $data;
+ }
